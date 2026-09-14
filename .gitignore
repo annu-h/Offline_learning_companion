@@ -1,0 +1,41 @@
+.claude/
+# Python
+__pycache__/
+*.py[cod]
+
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment / secrets
+.env
+.env.*
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Audio generated during runtime
+Audio/*
+!Audio/.gitkeep
+
+# Whisper / ML model files
+Models/whisper-base-en/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,11 @@
+category,question,answer,accepted
+Alphabet,What letter comes after A?,B,b
+Alphabet,What letter comes after C?,D,d
+Numbers,What number comes after two?,three,3|three
+Numbers,What number comes after nine?,ten,10|ten
+Colors,What color is a banana?,yellow,yellow
+Colors,What color is the sky?,blue,blue
+Animals,What animal says meow?,cat,cat
+Animals,What animal says moo?,cow,cow
+Math,What is two plus three?,5,5|five
+Math,What is ten minus six?,4,4|four
