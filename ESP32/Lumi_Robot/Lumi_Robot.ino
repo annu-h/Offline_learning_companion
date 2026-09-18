@@ -47,14 +47,14 @@
 // ================================================================
 
 // -------------------- INMP441 I2S Microphone --------------------
-#define MIC_BCK_PIN     14    // I2S0 Serial Clock
-#define MIC_WS_PIN      15    // I2S0 Word Select (LRCK)
-#define MIC_DATA_PIN    32    // I2S0 Serial Data Input
+#define MIC_BCK_PIN     26    // I2S0 Serial Clock
+#define MIC_WS_PIN      25    // I2S0 Word Select (LRCK)
+#define MIC_DATA_PIN    33    // I2S0 Serial Data Input
 
 // -------------------- MAX98357A I2S Amplifier -------------------
-#define SPEAKER_BCK_PIN 25    // I2S1 Serial Clock
-#define SPEAKER_WS_PIN  26    // I2S1 Word Select (LRCK)
-#define SPEAKER_DATA_PIN 27   // I2S1 Serial Data Output (DIN)
+#define SPEAKER_BCK_PIN 27    // I2S1 Serial Clock
+#define SPEAKER_WS_PIN  14    // I2S1 Word Select (LRCK)
+#define SPEAKER_DATA_PIN 13   // I2S1 Serial Data Output (DIN)
 
 // -------------------- DS3231 RTC (I2C) --------------------------
 #define RTC_SDA_PIN     21    // I2C Data
@@ -67,7 +67,7 @@
 #define SD_SCK_PIN      18    // Clock
 
 // -------------------- Push Button -------------------------------
-#define BUTTON_PIN      33    // Push button (active LOW with pull-up)
+#define BUTTON_PIN      4    // Push button (active LOW with pull-up)
 
 // -------------------- Audio Configuration -----------------------
 #define SAMPLE_RATE     32000  // INMP441 operates at 32kHz
