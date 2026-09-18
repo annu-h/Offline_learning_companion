@@ -87,6 +87,7 @@
 #include <SD.h>            // SD card via SPI
 #include <SPI.h>           // SPI bus for SD card
 #include <RTClib.h>        // DS3231 RTC library
+#include <math.h>            // sqrt() for microphone test
 
 // ================================
 // GLOBALS
@@ -112,6 +113,7 @@ File audioFile;
 
 // RTC object
 RTC_DS3231 rtc;
+bool rtcInitialized = false;
 
 // ================================
 // FORWARD DECLARATIONS
@@ -129,7 +131,7 @@ void cmdPING(void);
 void cmdHELP(void);
 void cmdSTATUS(void);
 void cmdGET_TIME(void);
-void cmdSET_TIME(void);
+void cmdSET_TIME(String command);
 void cmdMIC_TEST(void);
 void cmdSD_STATUS(void);
 void cmdSD_LIST(void);
@@ -140,6 +142,7 @@ void cmdWRONG(void);
 void cmdSPEAKING(void);
 void cmdSTOP(void);
 void sendResponse(const char* response);
+void parseAndSetTime(String timeData);
 
 // ================================
 // SETUP
@@ -238,12 +241,6 @@ void setupMicrophone(void) {
     return;
   }
 
-  // Set I2S0 rx buffer size
-  err = i2s_set_rx_buf_size(I2S_NUM_0, BUFFER_SIZE * 8);
-  if (err != ESP_OK) {
-    Serial.println("[WARNING] Could not set RX buffer size, using default.");
-  }
-
   Serial.println("[MIC] INMP441 microphone initialized successfully.");
   Serial.println("[MIC] Pins: BCK=GPIO14, WS=GPIO15, DATA=GPIO32");
 }
@@ -299,12 +296,6 @@ void setupSpeaker(void) {
     return;
   }
 
-  // Set I2S1 tx buffer size
-  err = i2s_set_tx_buf_size(I2S_NUM_1, BUFFER_SIZE * 8);
-  if (err != ESP_OK) {
-    Serial.println("[WARNING] Could not set TX buffer size, using default.");
-  }
-
   // Mute the speaker initially
   i2s_zero_dma_buffer(I2S_NUM_1);
 
@@ -323,21 +314,25 @@ void setupRTC(void) {
   if (!rtc.begin()) {
     Serial.println("[ERROR] Failed to initialize DS3231 RTC.");
     Serial.println("[ERROR] Check wiring (SDA=GPIO21, SCL=GPIO22) and power.");
+    rtcInitialized = false;
     return;
   }
+
+  rtcInitialized = true;
 
   // Check if RTC lost power and set default time if needed
   if (rtc.lostPower()) {
     Serial.println("[RTC] WARNING: RTC lost power. Setting time to compile date.");
-    // Set a default time - user should update via SET_TIME command
-    rtc.adjust(DateTime(F__DATE__, F__TIME__));
+    // Set a default time - user can update it with SET_TIME command.
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 
-  // Verify RTC is running
+  // Verify RTC time is reasonable.
   DateTime now = rtc.now();
   if (now.year() < 2020) {
     Serial.println("[RTC] WARNING: RTC time appears invalid. Setting default time.");
-    rtc.adjust(DateTime(F__DATE__, F__TIME__));
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    now = rtc.now();
   }
 
   Serial.println("[RTC] DS3231 initialized successfully.");
@@ -506,8 +501,8 @@ void processCommand(String command) {
     cmdSTATUS();
   } else if (command == "GET_TIME") {
     cmdGET_TIME();
-  } else if (command == "SET_TIME") {
-    cmdSET_TIME();
+  } else if (command.startsWith("SET_TIME")) {
+    cmdSET_TIME(command);
   } else if (command == "MIC_TEST") {
     cmdMIC_TEST();
   } else if (command == "SD_STATUS") {
@@ -566,7 +561,7 @@ void cmdSTATUS(void) {
 
 // GET_TIME → TIME:YYYY-MM-DD HH:MM:SS
 void cmdGET_TIME(void) {
-  if (!rtc.isInitialized()) {
+  if (!rtcInitialized) {
     Serial.println("ERROR:RTC_NOT_INITIALIZED");
     return;
   }
@@ -578,18 +573,23 @@ void cmdGET_TIME(void) {
   Serial.println(timeStr);
 }
 
-// SET_TIME - Set RTC time from serial command
+// SET_TIME - Set RTC time from a complete serial command
 // Format: SET_TIME YYYY-MM-DD HH:MM:SS
-void cmdSET_TIME(void) {
-  if (!rtc.isInitialized()) {
+void cmdSET_TIME(String command) {
+  if (!rtcInitialized) {
     Serial.println("ERROR:RTC_NOT_INITIALIZED");
     return;
   }
 
-  // Parse the remaining string for date and time
-  // The full command string is parsed here
-  // Expected format after "SET_TIME": YYYY-MM-DD HH:MM:SS
-  String timeStr = Serial.readStringUntil('\n');
+  // Remove the command name and keep only the timestamp.
+  command.trim();
+  if (command.length() < 8) {
+    Serial.println("ERROR:INVALID_TIME_FORMAT");
+    Serial.println("Use: SET_TIME YYYY-MM-DD HH:MM:SS");
+    return;
+  }
+
+  String timeStr = command.substring(8);
   timeStr.trim();
 
   if (timeStr.length() < 19) {
@@ -598,19 +598,29 @@ void cmdSET_TIME(void) {
     return;
   }
 
-  int year = timeStr.substring(0, 4).toInt();
-  int month = timeStr.substring(5, 7).toInt();
-  int day = timeStr.substring(8, 10).toInt();
-  int hour = timeStr.substring(11, 13).toInt();
+  int year   = timeStr.substring(0, 4).toInt();
+  int month  = timeStr.substring(5, 7).toInt();
+  int day    = timeStr.substring(8, 10).toInt();
+  int hour   = timeStr.substring(11, 13).toInt();
   int minute = timeStr.substring(14, 16).toInt();
   int second = timeStr.substring(17, 19).toInt();
 
-  if (year < 2020 || month < 1 || month > 12 || day < 1 || day > 31) {
+  if (year < 2020 ||
+      month < 1 || month > 12 ||
+      day < 1 || day > 31 ||
+      hour < 0 || hour > 23 ||
+      minute < 0 || minute > 59 ||
+      second < 0 || second > 59 ||
+      timeStr.charAt(4) != '-' ||
+      timeStr.charAt(7) != '-' ||
+      timeStr.charAt(10) != ' ' ||
+      timeStr.charAt(13) != ':' ||
+      timeStr.charAt(16) != ':') {
     Serial.println("ERROR:INVALID_TIME_VALUE");
     return;
   }
 
-  DateTime newTime = DateTime(year, month, day, hour, minute, second);
+  DateTime newTime(year, month, day, hour, minute, second);
   rtc.adjust(newTime);
   Serial.println("TIME_SET:OK");
 }
